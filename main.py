@@ -64,7 +64,7 @@ def get_dump_images_list():
                             'camera': camera_param,
                             'full_path': full_path,
                             'date': file_datetime.date().isoformat(),
-                            'time': file_datetime.time().isoformat()
+                            'time': file_datetime.strftime('%I:%M %p')
                         })
         else:
             for camera_folder in os.listdir(base_path):
@@ -81,7 +81,7 @@ def get_dump_images_list():
                                 'camera': camera_folder,
                                 'full_path': full_path,
                                 'date': file_datetime.date().isoformat(),
-                                'time': file_datetime.time().isoformat()
+                                'time': file_datetime.strftime('%I:%M %p')
                             })
 
         all_files.sort(key=lambda x: int(re.sub('\D', '', x['filename'])))
