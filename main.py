@@ -49,6 +49,9 @@ def get_dump_images_list():
         start_date_param = request.args.get('start_date')
         end_date_param = request.args.get('end_date')
 
+        if start_date_param == end_date_param:
+            end_date_param=None
+
         all_files = []
         if camera_param:
             camera_path = os.path.join(base_path, camera_param)
