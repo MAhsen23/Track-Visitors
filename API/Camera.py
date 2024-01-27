@@ -1,7 +1,10 @@
+import base64
+import re
 import pyodbc
 from flask import jsonify,request
-
+import os
 import DB_Connection
+import datetime
 conn_string = DB_Connection.conn_string()
 
 def get_all_cameras():
@@ -457,3 +460,71 @@ def get_restricted_cameras():
     except Exception as e:
         print(e)
         return jsonify({'error': 'Failed to fetch restricted cameras.'}), 500
+
+
+
+
+
+
+
+def get_dump_images():
+    try:
+        base_path = 'Unknown_Persons'
+        camera_param = request.args.get('camera')
+        start_date_param = request.args.get('start_date')
+        end_date_param = request.args.get('end_date')
+
+        all_files = []
+        if camera_param:
+            camera_path = os.path.join(base_path, camera_param)
+            if os.path.isdir(camera_path):
+                files_in_camera = os.listdir(camera_path)
+                for filename in files_in_camera:
+                    full_path = os.path.join(base_path, camera_param, filename)
+                    file_datetime = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
+                    if (not start_date_param or file_datetime.date() >= datetime.datetime.fromisoformat(
+                            start_date_param).date()) and \
+                            (not end_date_param or file_datetime.date() <= datetime.datetime.fromisoformat(
+                                end_date_param).date()):
+                        with open(full_path, "rb") as image_file:
+                            encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+                        all_files.append({
+                            'filename': filename,
+                            'camera': camera_param,
+                            'full_path': full_path,
+                            'date': file_datetime.date().isoformat(),
+                            'time': file_datetime.strftime('%I:%M %p'),
+                            'image':encoded_image
+                        })
+        else:
+            for camera_folder in os.listdir(base_path):
+                camera_path = os.path.join(base_path, camera_folder)
+                if os.path.isdir(camera_path):
+                    files_in_camera = os.listdir(camera_path)
+                    for filename in files_in_camera:
+                        full_path = os.path.join(base_path, camera_folder, filename)
+                        file_datetime = datetime.datetime.fromtimestamp(os.path.getmtime(full_path))
+                        if (not start_date_param or file_datetime.date() >= datetime.datetime.fromisoformat(
+                                start_date_param).date()) and \
+                                (not end_date_param or file_datetime.date() <= datetime.datetime.fromisoformat(
+                                    end_date_param).date()):
+
+                            with open(full_path, "rb") as image_file:
+                                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+                            all_files.append({
+                                'filename': filename,
+                                'camera': camera_folder,
+                                'full_path': full_path,
+                                'date': file_datetime.date().isoformat(),
+                                'time': file_datetime.strftime('%I:%M %p'),
+                                'image': encoded_image
+                            })
+
+        all_files.sort(key=lambda x: int(re.sub('\D', '', x['filename'])))
+        return jsonify(images=all_files)
+
+    except Exception as e:
+        print(e)
+        return str(e)

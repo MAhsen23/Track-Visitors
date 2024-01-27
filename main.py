@@ -268,6 +268,11 @@ def get_restricted_cameras_route():
     return Camera.get_restricted_cameras()
 
 
+@app.route('/GetDumpImages')
+def get_dump_images_route():
+    return Camera.get_dump_images()
+
+
 @app.route('/GetVisitorsReport', methods=['POST'])
 def get_visitors_report_route():
     response = Reports.get_visitors_report()
