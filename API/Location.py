@@ -15,6 +15,12 @@ def get_all_locations():
                 columns = [column[0] for column in cursor.description]
                 rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
+                for row in rows:
+                    restrict_check_query = f"SELECT TOP 1 CASE WHEN id IS NOT NULL AND end_datetime >= GETDATE() THEN 'True' ELSE 'False' END AS 'restrict' FROM RestrictedLocation WHERE location_id = {row['id']} ORDER BY id DESC"
+                    cursor.execute(restrict_check_query)
+                    restrict_result = cursor.fetchone()
+                    row['restrict'] = restrict_result[0] if restrict_result else 'False'
+
         return jsonify(rows), 200
 
     except Exception as e:
@@ -22,11 +28,40 @@ def get_all_locations():
         return jsonify({'error': 'Failed to fetch locations.'}), 500
 
 
+def restrict_location():
+    try:
+        location_ids = request.json['locations']
+        start_datetime = request.json['start_datetime']
+        end_datetime = request.json['end_datetime']
+
+        if not all([location_ids, start_datetime, end_datetime]):
+            return jsonify({'error': 'Invalid input data.'}), 400
+
+        with pyodbc.connect(conn_string) as conn:
+            with conn.cursor() as cursor:
+                try:
+                    query = "INSERT INTO RestrictedLocation (location_id, start_datetime, end_datetime) VALUES (?, ?, ?)"
+                    for location_id in location_ids:
+                        cursor.execute(query, location_id, start_datetime, end_datetime)
+
+                    conn.commit()
+
+                except Exception as e:
+                    print(e)
+                    conn.rollback()
+                    return jsonify({'error': 'Failed to restrict location. Database changes rolled back.'}), 500
+
+        return jsonify({'success': 'Location restricted successfully!'}), 201
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error':'Failed to restrict location.'}),500
+
 
 
 def get_restricted_locations():
     try:
-        query = "SELECT RL.id as 'restricted_id',L.id as 'location_id',L.name as 'location_name', RL.start_datetime as 'start_datetime',RL.end_datetime as 'end_datetime'"
+        query = "SELECT RL.id as 'restricted_id',L.id as 'location_id',L.name as , RL.start_datetime as 'start_datetime',RL.end_datetime as 'end_datetime' from RestrictedLocation RL JOIN Location L on L.id = RL.location_id where RL.end_datetime >= GETDATE();"
 
         with pyodbc.connect(conn_string) as conn:
             with conn.cursor() as cursor:
@@ -56,9 +91,6 @@ def get_locations_by_floor(floor_id):
     except Exception as e:
         print(e)
         return jsonify({'error': f'Failed to fetch locations by floor_id: {floor_id}.'}), 500
-
-
-
 
 
 def add_location():

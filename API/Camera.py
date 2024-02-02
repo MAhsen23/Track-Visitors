@@ -464,9 +464,6 @@ def get_restricted_cameras():
 
 
 
-
-
-
 def get_dump_images():
     try:
         base_path = 'Unknown_Persons'

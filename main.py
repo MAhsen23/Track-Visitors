@@ -223,6 +223,16 @@ def get_location_by_camera_id_route(id):
     return Location.get_location_by_camera_id(id)
 
 
+@app.route('/GetRestrictedLocations', methods=['GET'])
+def get_restricted_locations_route():
+    return Location.get_restricted_locations()
+
+
+@app.route('/RestrictLocation', methods=['POST'])
+def restrict_location_route():
+    return Location.restrict_location()
+
+
 @app.route('/GetAllCameras', methods=['GET'])
 def get_all_cameras():
     return Camera.get_all_cameras()
