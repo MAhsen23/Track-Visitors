@@ -61,7 +61,7 @@ def restrict_location():
 
 def get_restricted_locations():
     try:
-        query = "SELECT RL.id as 'restricted_id',L.id as 'location_id',L.name as , RL.start_datetime as 'start_datetime',RL.end_datetime as 'end_datetime' from RestrictedLocation RL JOIN Location L on L.id = RL.location_id where RL.end_datetime >= GETDATE();"
+        query = "SELECT RL.id as 'restricted_id',L.id as 'location_id',L.name as 'location_name', RL.start_datetime as 'start_datetime',RL.end_datetime as 'end_datetime' from RestrictedLocation RL JOIN Location L on L.id = RL.location_id where RL.end_datetime >= GETDATE();"
 
         with pyodbc.connect(conn_string) as conn:
             with conn.cursor() as cursor:
@@ -74,6 +74,8 @@ def get_restricted_locations():
     except Exception as e:
         print(e)
         return jsonify({'error': 'Failed to fetch restricted locations.'}), 500
+
+
 
 
 def get_locations_by_floor(floor_id):

@@ -42,8 +42,6 @@ def get_paths():
 
 
 
-
-
 def get_location_paths():
     try:
         source = request.json['source']
@@ -61,10 +59,19 @@ def get_location_paths():
         source_camera_id = response.json()[0]['camera_id']
 
         paths = Extras_Func.find_all_paths(connection_matrix,source_camera_id,destination_cam_ids)
+        response = requests.get(f'{url}/GetRestrictedCameras')
+        restricted_details = response.json()
+
+        restricted_cam_ids = []
+        for restricted_detail in restricted_details:
+            if restricted_detail['camera_id'] is not None:
+                restricted_cam_ids.append(restricted_detail['camera_id'])
 
         locationPaths = []
 
         for path_index, path in enumerate(paths):
+            if any(camera_id in restricted_cam_ids for camera_id in path):
+                continue
 
             locationPath = []
             last_camera_index = len(path) - 1
@@ -87,6 +94,7 @@ def get_location_paths():
                         locationPath.append(rows[0]['LocationName'])
 
             locationPaths.append(locationPath)
+
         return jsonify(locationPaths)
 
     except Exception as e:

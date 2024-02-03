@@ -283,6 +283,11 @@ def get_dump_images_route():
     return Camera.get_dump_images()
 
 
+@app.route('/GetVisitorReport')
+def get_visitor_report_route():
+    return Reports.get_visitor_report()
+
+
 @app.route('/GetVisitorsReport', methods=['POST'])
 def get_visitors_report_route():
     response = Reports.get_visitors_report()
