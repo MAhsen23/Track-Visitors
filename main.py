@@ -232,11 +232,17 @@ def get_restricted_locations_route():
 def restrict_location_route():
     return Location.restrict_location()
 
+@app.route('/PermitLocation')
+def permit_location_route():
+    return Location.permit_location()
 
 @app.route('/GetAllCameras', methods=['GET'])
 def get_all_cameras():
     return Camera.get_all_cameras()
 
+@app.route('/GetCameraById', methods=['GET'])
+def get_camera_by_id():
+    return Camera.get_camera_by_id()
 
 @app.route('/AddCamera', methods=['POST'])
 def add_camera_route():
@@ -293,7 +299,6 @@ def get_visitors_report_route():
     response = Reports.get_visitors_report()
     return Reports.get_visitors_report()
 
-
 @app.route('/DownloadVisitorsReport', methods=['POST'])
 def download_visitors_report_route():
     return Reports.download_visitors_report()
@@ -313,11 +318,13 @@ def get_alert_count_route():
 def get_current_alert_route():
     return Alert.get_current_alerts()
 
-
 @app.route('/GetAllAlerts', methods=['GET'])
 def get_all_alerts_route():
     return Alert.get_all_alerts()
 
+@app.route('/GetVisitorAlerts', methods=['GET'])
+def get_visitor_alerts_route():
+    return Alert.get_visitor_alerts()
 
 @app.route('/AddVisitor', methods=['POST'])
 def add_visitor():
@@ -372,6 +379,17 @@ def get_all_visitors_route():
 def get_current_visitors_route():
    return Visitor.get_current_visitors()
 
+@app.route('/GetTodayVisitors', methods=['GET'])
+def get_today_visitors_route():
+    return Visitor.get_today_visitors()
+
+@app.route('/GetSearchTodayVisitors', methods=['GET'])
+def get_search_today_visitors_route():
+    return Visitor.search_today_visitors()
+
+@app.route('/GetWeeklyVisitors', methods=['GET'])
+def get_weekly_visitors_route():
+    return Visitor.get_weekly_visitors()
 
 @app.route('/GetBlockVisitors', methods=['GET'])
 def get_block_visitors_route():
@@ -382,6 +400,9 @@ def get_block_visitors_route():
 def block_visitor_route():
     return Block.block_visitor()
 
+@app.route('/BlockVisitorForDay')
+def block_visitor_for_day():
+    return Block.block_visitor_for_one_day()
 
 @app.route('/ExtendBlock/<int:id>', methods=['POST'])
 def extend_block_route(id):
@@ -639,7 +660,7 @@ def generate_warnings(threshold,visit_id,entry_time,source_cam_id,paths):
                 max_time = max([t for t in time_values if t is not None])
 
                 current_datetime = datetime.datetime.now()
-                current_time_str = current_datetime.datetime.strftime('%H:%M:%S.%f')[:-3]
+                current_time_str = current_datetime.strftime('%H:%M:%S.%f')[:-3]
 
                 visit_cam_time_str = newRows[0]['visit_cam_time']
                 time_parts = visit_cam_time_str.split(".")
@@ -819,9 +840,27 @@ def start_visit_threads():
         response = requests.post(f'{url}/GetPaths', json=json_data, headers=headers)
         paths = response.json()
 
-        locationPaths = []
+        print(paths)
+        response = requests.get(f'{url}/GetRestrictedCameras')
+        restricted_details = response.json()
 
+        restricted_cam_names = []
+        for restricted_detail in restricted_details:
+            if restricted_detail['camera_id'] is not None:
+                restricted_cam_names.append(restricted_detail['camera_name'])
+
+        camera_paths = []
+        for path in paths:
+            if any(camera_name in restricted_cam_names for camera_name in path):
+                continue
+            else:
+                camera_paths.append(path)
+        paths = camera_paths
+
+
+        locationPaths = []
         for path_index, path in enumerate(paths):
+
             locationPath = []
             last_camera_index = len(path) - 1
 
@@ -883,6 +922,9 @@ def start_visit_threads():
 def get_visit_entry_time_route(id):
     return Visit.get_visit_entry_time(id)
 
+@app.route('/GetVisitDestinations')
+def get_visit_destinations_route():
+    return Visit.get_visit_destinations()
 
 @app.route('/EndVisit', methods=['POST'])
 def end_visit():
@@ -929,6 +971,9 @@ def get_paths_route():
 def get_location_paths_route():
     return Path.get_location_paths()
 
+@app.route('/GetLocationPathsWithTime',methods=['POST'])
+def get_location_paths_with_time_route():
+    return Path.get_location_paths_with_time()
 
 @app.route('/GetConnectionMatrix')
 def get_connection_matrix_route():

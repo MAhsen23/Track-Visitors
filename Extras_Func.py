@@ -135,3 +135,18 @@ def get_cost_matrix_with_ids(conn_string):
 
     costMatrix = {id: times for id, times in zip(camera_ids, camera_dict.values())}
     return costMatrix
+
+
+
+def get_time_btw_cams(conn_string, source_cam,destination_cam):
+    connection = pyodbc.connect(conn_string)
+    cursor = connection.cursor()
+
+    query = f"SELECT timeToReach FROM Connection WHERE sourceCam_id = {source_cam} AND destinationCam_id = {destination_cam}"
+    cursor.execute(query)
+    time_row = cursor.fetchone()
+    if time_row:
+        time_to_reach = time_row[0]
+
+    return time_to_reach
+

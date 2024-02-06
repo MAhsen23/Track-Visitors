@@ -147,3 +147,35 @@ def extend_block(visitor_id):
     except Exception as e:
         print(e)
         return jsonify({'error': 'Failed to extend block.'}), 500
+
+
+
+
+def block_visitor_for_one_day():
+    try:
+        visitor_id = request.args.get('id')
+        user_id = request.args.get('user_id')
+
+        start_date = (datetime.now()).date()
+        end_date = (datetime.now() + timedelta(days=1)).date()
+
+        if not visitor_id:
+            return jsonify({'error': 'Visitor ID not provided.'}), 400
+
+        response = requests.get(f'{url}/CheckVisitorBlocked/{visitor_id}')
+
+        if response.json()['blocked']:
+            return jsonify({'error': 'Visitor is already blocked.'}), 400
+
+        query=f"INSERT INTO Block (user_id, visitor_id, start_date, end_date) VALUES ({user_id}, {visitor_id}, '{start_date}', '{end_date}')"
+
+        with pyodbc.connect(conn_string) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                conn.commit()
+
+        return jsonify({'message': 'Visitor blocked successfully.'}), 200
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'Failed to block visitor.'}), 500

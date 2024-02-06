@@ -1,6 +1,6 @@
 import base64
 import os
-
+from collections import Counter
 import pyodbc
 from flask import jsonify, request, send_file, after_this_request
 from datetime import datetime
@@ -126,14 +126,16 @@ def get_visitor_report():
                 columns = [column[0] for column in cursor.description]
                 rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
-        # for row in rows:
-        #     directory_path = f'Images/{visitor_id}'
-        #     filename = os.listdir(directory_path)[0]
-        #     with open(os.path.join(directory_path, filename), "rb") as image_file:
-        #         encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
-        #     row['image'] = encoded_image
+        most_visited_location = Counter(location for row in rows for location in row['LocationsVisited'].split(', ')).most_common(1)
 
-        return jsonify(rows), 200
+
+        directory_path = f'Images/{visitor_id}'
+        filename = os.listdir(directory_path)[0]
+
+        with open(os.path.join(directory_path, filename), "rb") as image_file:
+            encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+
+        return jsonify({'visitor_report': rows, 'most_visited_location': most_visited_location, 'visitor_image':encoded_image}), 200
 
     except Exception as e:
         print(e)

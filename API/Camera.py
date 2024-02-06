@@ -25,6 +25,26 @@ def get_all_cameras():
 
 
 
+def get_camera_by_id():
+    try:
+        camera_id = request.args.get('id')
+        query=f"select * from Camera where id = '{camera_id}'";
+
+        with pyodbc.connect(conn_string) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                columns = [column[0] for column in cursor.description]
+                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        if len(rows) != 0:
+            return jsonify(rows[0]), 200
+        return jsonify(rows), 200
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'Failed to fetch camera by id.'}), 500
+
+
+
 
 
 def get_all_cameras_locations_connections():
@@ -121,7 +141,6 @@ def add_camera():
                             cursor.execute(cost_query, (destination_cam_id, source_cam_id, connection_time))
                             conn.commit()
 
-                    # Remove connections between cameras if a new camera is inserted
                     for rowCamId in connectedCameras:
                         for colCamId in connectedCameras:
                             if rowCamId == colCamId:
@@ -192,19 +211,14 @@ def update_camera(camera_id):
         connectedCameras = request.json.get('connectedCameras')
         times = request.json.get('time')
 
-        # Update camera's name in the Camera table
         camera_query = f"UPDATE [Camera] SET name = '{name}' WHERE id = {camera_id}"
 
-        # Delete existing camera's locations from the CameraLocation table
         delete_location_query = "DELETE FROM [CameraLocation] WHERE camera_id = ?"
 
-        # Create SQL query for camera location insertion
         location_query = "INSERT INTO [CameraLocation] (camera_id, location_id) VALUES (?, ?)"
 
-        # Delete existing camera's costs from the Cost table
         delete_cost_query = "DELETE FROM [Connection] WHERE sourceCam_id = ? OR destinationCam_id = ?"
 
-        # Create SQL query for cost insertion
         cost_query = "INSERT INTO [Connection] (sourceCam_id, destinationCam_id, timeToReach) VALUES (?, ?, ?)"
 
         delete_connection_query = "DELETE FROM [Connection] WHERE sourceCam_id = ? AND destinationCam_id = ?"
@@ -215,23 +229,19 @@ def update_camera(camera_id):
                     cursor.execute(camera_query)
                     conn.commit()
 
-                    # Delete existing camera's locations
                     cursor.execute(delete_location_query, (camera_id,))
                     conn.commit()
 
-                    # Insert new camera locations
                     for location_id in cameraLocations:
                         cursor.execute(location_query, (camera_id, location_id))
                         conn.commit()
 
-                    # Delete existing camera's costs
                     cursor.execute(delete_cost_query, (camera_id, camera_id))
                     conn.commit()
 
                     cursor.execute(cost_query, (camera_id, camera_id, 0))
                     conn.commit()
 
-                    # Insert new camera costs
                     for i in range(len(connectedCameras)):
                         source_cam_id = camera_id
                         destination_cam_id = connectedCameras[i]
@@ -260,7 +270,6 @@ def update_camera(camera_id):
                                         print(rowCamId, colCamId)
                                         cursor.execute(delete_connection_query, (rowCamId, colCamId))
                                         conn.commit()
-
 
                 except Exception as e:
                     print(e)
@@ -303,24 +312,18 @@ def get_adjacency_matrix():
     conn = pyodbc.connect(conn_string)
     cursor = conn.cursor()
 
-    # Fetch Camera data
     cursor.execute('SELECT id, name FROM Camera ORDER BY id')
     camera_data = cursor.fetchall()
 
-    # Fetch Connection data
     cursor.execute('SELECT sourceCam_id, destinationCam_id, timeToReach FROM Connection')
     cost_data = cursor.fetchall()
 
-    # Create a dictionary to map camera IDs to indices
     camera_indices = {camera[0]: i for i, camera in enumerate(camera_data)}
 
-    # Get the number of cameras
     num_cameras = len(camera_indices)
 
-    # Initialize the adjacency matrix with -1
     adjacency_matrix = [[-1] * num_cameras for _ in range(num_cameras)]
 
-    # Populate the adjacency matrix with timeToReach values
     for cost in cost_data:
         source_cam = cost[0]
         dest_cam = cost[1]
@@ -331,13 +334,11 @@ def get_adjacency_matrix():
             dest_idx = camera_indices[dest_cam]
             adjacency_matrix[source_idx][dest_idx] = time_to_reach
 
-    # Get the sorted row and column names
     row_names = [camera[1] for camera in camera_data]
     column_names = [camera[1] for camera in camera_data]
 
     conn.close()
 
-    # Prepare the response with sorted data
     response = {
         'matrix': adjacency_matrix,
         'rowNames': row_names,
@@ -352,17 +353,14 @@ def get_adjacency_matrix():
 
 
 def update_adjacency_matrix():
-    # Create a cursor to execute SQL queries
     conn = pyodbc.connect(conn_string)
 
-    # Create a cursor to execute SQL queries
     cursor = conn.cursor()
 
     matrix = request.json['matrix']
     rows = request.json['rowNames']
     columns = request.json['columnNames']
 
-    # Loop through the cost matrix and update the cost values in the database
     for i in range(len(matrix)):
         for j in range(len(matrix[i])):
             sourceCam = rows[i]
@@ -370,7 +368,6 @@ def update_adjacency_matrix():
             time = matrix[i][j]
 
             if int(time) >= 0:
-                # Check if the record exists before updating
                 cursor.execute(
                     "SELECT COUNT(*) FROM Connection ct join Camera sc on sc.id = ct.sourceCam_id join Camera dc on dc.id = ct.destinationCam_id WHERE sc.name = ? AND dc.name = ?",
                     (sourceCam, destinationCam)
@@ -378,7 +375,6 @@ def update_adjacency_matrix():
                 record_count = cursor.fetchone()[0]
 
                 if record_count > 0:
-                    # Update cost value
                     cursor.execute(
                         "UPDATE Connection SET timeToReach = ? From Connection ct join Camera sc on sc.id = ct.sourceCam_id join Camera dc on dc.id = ct.destinationCam_id WHERE sc.name = ? AND dc.name = ?",
                         (time, sourceCam, destinationCam))
@@ -394,14 +390,12 @@ def update_adjacency_matrix():
                     )
                     source_cam_id = cursor.fetchone()[0]
 
-                    # Fetch destinationCam_id based on destinationCamName
                     cursor.execute(
                         "SELECT id FROM Camera WHERE name = ?",
                         (destinationCam)
                     )
                     destination_cam_id = cursor.fetchone()[0]
 
-                    #insert record
                     cursor.execute(
                         "INSERT INTO Connection (sourceCam_id, destinationCam_id, timeToReach) VALUES (?, ?, ?)",
                         (source_cam_id, destination_cam_id, time)
@@ -413,7 +407,6 @@ def update_adjacency_matrix():
                     )
 
             else:
-                # Delete the record
                 cursor.execute(
                     "DELETE FROM Connection From Connection ct join Camera sc on sc.id = ct.sourceCam_id join Camera dc on dc.id = ct.destinationCam_id  WHERE sc.name = ? AND dc.name = ?",
                     (sourceCam, destinationCam)

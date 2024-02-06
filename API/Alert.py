@@ -1,8 +1,12 @@
+import os
 from datetime import datetime
 import pyodbc
 from flask import jsonify,request
 import DB_Connection
 conn_string = DB_Connection.conn_string()
+url = DB_Connection.url()
+from Extras_Func import load_records
+import requests
 
 def add_alert():
     try:
@@ -88,6 +92,7 @@ def get_all_alerts():
             CONVERT(DATE, A.datetime) AS 'date', -- Separate date
             FORMAT(A.datetime, 'hh:mm tt') AS 'time', -- Separate time
             A.visit_id,
+            VR.id AS 'visitor_id',
             VR.name AS 'visitor_name',
             VR.phone AS 'visitor_contact',
             A.camera_id,
@@ -124,6 +129,7 @@ def get_all_alerts():
             L.id,
             C.name,
             VR.name,
+            VR.id,
             A.type,
             VR.phone
             
@@ -141,6 +147,118 @@ def get_all_alerts():
                 rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         return jsonify(rows), 200
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'Failed to fetch current alerts.'}), 500
+
+
+def get_visitor_alerts():
+    try:
+        visitor_id = request.args.get('id')
+
+        query = f"""SELECT
+            A.id,
+            A.type as 'type',
+            CONVERT(DATE, A.datetime) AS 'date',
+            FORMAT(A.datetime, 'hh:mm tt') AS 'time',
+            A.visit_id,
+            VR.id AS 'visitor_id',
+            VR.name AS 'visitor_name',
+            VR.phone AS 'visitor_contact',
+            A.camera_id,
+            L.id AS 'location_id',
+            STRING_AGG(L.name, ', ') AS 'destinations',
+            C.name AS 'camera_name',
+            (
+                SELECT TOP 1 L.name
+                FROM CameraLocation CL
+                JOIN Location L ON L.id = CL.location_id
+                WHERE CL.camera_id = A.camera_id
+            ) AS 'current_location'
+        FROM
+            Alert A
+        JOIN
+            Camera C ON C.id = A.camera_id
+        JOIN
+            VisitDestination VD ON A.visit_id = VD.visit_id
+        JOIN
+            Location L ON L.id = VD.destination_id
+        JOIN 
+            VISIT VS ON VS.id = A.visit_id
+        JOIN 
+            Visitor VR ON VR.id = VS.visitor_id
+
+        WHERE
+        VS.exit_time IS NULL AND VR.id = {visitor_id}
+
+        GROUP BY
+            A.id,
+            A.datetime,
+            A.visit_id,
+            A.camera_id,
+            L.id,
+            C.name,
+            VR.name,
+            VR.id,
+            A.type,
+            VR.phone
+
+            order by A.datetime desc
+            ;"""
+
+        with pyodbc.connect(conn_string) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                columns = [column[0] for column in cursor.description]
+                main_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        if len(main_rows)>0:
+
+            query = f"SELECT top 1 * FROM Visit where visitor_id = {visitor_id} and exit_time is NULL"
+            with pyodbc.connect(conn_string) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query)
+                    columns = [column[0] for column in cursor.description]
+                    visit_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            visit_id = visit_rows[0]['id'];
+
+            query_to_chk_poss = f"select top 1 * from VisitPathHistory where is_violated=0 and visit_id={visit_id} order by id desc"
+            with pyodbc.connect(conn_string) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query_to_chk_poss)
+                    columns = [column[0] for column in cursor.description]
+                    cam_rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            camera_id = cam_rows[0]['camera_id'];
+
+            response = requests.get(f'{url}/GetCameraById?id={camera_id}', )
+            new_rows = response.json()
+            if len(new_rows) != 0:
+                current_correct_camera = new_rows['name']
+
+            folder_path = 'VisitCorrectPaths'
+            file_name = os.path.join(folder_path, f"{visitor_id}.json")
+            paths = load_records(file_name)
+
+            print(current_correct_camera)
+            next_moves = []
+
+            for path in paths:
+                print(len(path))
+                for i in range(len(path)):
+                    if path[i] == current_correct_camera:
+                        
+                        response = requests.get(f'{url}/GetLocationByCamera/{path[i+1]}', )
+                        rows = response.json()
+                        if len(rows) != 0:
+                            next_moves.append(rows[0]['LocationName'])
+
+            main_rows[0]['next_moves']=next_moves
+            return jsonify(main_rows[0]), 200
+
+        return jsonify({'success': 'No visitor alerts.'}),200
 
     except Exception as e:
         print(e)

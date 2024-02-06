@@ -101,6 +101,71 @@ def get_location_paths():
         return jsonify({'error': str(e)})
 
 
+def get_location_paths_with_time():
+    try:
+        source = request.json['source']
+        destinations = request.json['destinations']
+
+        connection_matrix = Extras_Func.get_cost_matrix_with_ids(conn_string)
+
+        destination_cam_ids = []
+        for destination_id in destinations:
+            response = requests.get(f'{url}/GetCameraByLocation/{destination_id}')
+            camera_id = response.json()[0]['camera_id']
+            destination_cam_ids.append(camera_id)
+
+        response = requests.get(f'{url}/GetCameraByLocation/{source}')
+        source_camera_id = response.json()[0]['camera_id']
+
+        paths = Extras_Func.find_all_paths(connection_matrix, source_camera_id, destination_cam_ids)
+        response = requests.get(f'{url}/GetRestrictedCameras')
+        restricted_details = response.json()
+
+        restricted_cam_ids = []
+        for restricted_detail in restricted_details:
+            if restricted_detail['camera_id'] is not None:
+                restricted_cam_ids.append(restricted_detail['camera_id'])
+
+        locationPaths = []
+        times = []
+
+        for path_index, path in enumerate(paths):
+            if any(camera_id in restricted_cam_ids for camera_id in path):
+                continue
+
+            total_time = 0
+            locationPath = []
+            last_camera_index = len(path) - 1
+
+            for camera_index, each_camera_id in enumerate(path):
+                is_last_camera = camera_index == last_camera_index
+                if is_last_camera:
+                    location_index = destination_cam_ids.index(each_camera_id)
+                    location_id = destinations[location_index]
+                    response = requests.get(f'{url}/GetLocation/{location_id}')
+                    rows = response.json()
+                    if len(rows) != 0:
+                        locationPath.append(rows[0]['name'])
+                else:
+                    timeBtwCameras = Extras_Func.get_time_btw_cams(conn_string,each_camera_id,str(path[camera_index + 1]))
+                    total_time += timeBtwCameras
+
+                    response = requests.get(f'{url}/GetLocationByCameraId/{each_camera_id}')
+                    rows = response.json()
+                    if len(rows) != 0:
+                        locationPath.append(rows[0]['LocationName'])
+
+            locationPaths.append(locationPath)
+            times.append(total_time)
+
+        sorted_paths_with_times = sorted(zip(locationPaths, times), key=lambda x: x[1])
+        sorted_paths, sorted_times = zip(*sorted_paths_with_times)
+
+        return jsonify({'locationPaths': sorted_paths, 'times': sorted_times})
+
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 
 def get_connection_matrix():
     try:

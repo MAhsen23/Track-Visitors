@@ -1,6 +1,7 @@
 import pyodbc
 from flask import jsonify,request
 import DB_Connection
+from datetime import datetime, timedelta
 conn_string = DB_Connection.conn_string()
 
 import pyodbc
@@ -103,3 +104,160 @@ def get_current_visitors():
     except Exception as e:
         print(e)
         return jsonify({'error': 'Failed to fetch current Visitors.'}), 500
+
+
+
+
+def get_today_visitors():
+    try:
+        query = f"""
+        SELECT
+        V.id AS VisitID,
+        Vi.id As VisitorId,
+        Vi.name AS VisitorName,
+        Vi.phone AS VisitorPhone,
+        STRING_AGG(L.name, ', ') AS LocationsVisited,
+        V.date AS VisitDate,
+        V.entry_time AS EntryTime,
+        V.exit_time AS ExitTime
+        FROM
+            Visit AS V
+        INNER JOIN
+            Visitor AS Vi ON V.visitor_id = Vi.id
+        INNER JOIN
+            VisitDestination AS Vd ON V.id = Vd.visit_id
+        INNER JOIN
+            Location AS L ON Vd.destination_id = L.id
+        where V.date='{(datetime.now()).date()}'
+        GROUP BY
+            V.id, Vi.id, Vi.name, Vi.phone, V.date, V.entry_time, V.exit_time
+        ORDER BY
+            VisitDate DESC, EntryTime
+        """
+
+        with pyodbc.connect(conn_string) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                columns = [column[0] for column in cursor.description]
+                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        for row in rows:
+            visitor_id = row['VisitorId']
+            directory_path = f'Images/{visitor_id}'
+            filename = os.listdir(directory_path)[0]
+            with open(os.path.join(directory_path, filename), "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+            row['image'] = encoded_image
+
+        return jsonify(rows), 200
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'Failed to fetch today visitors.'}), 500
+
+
+
+
+def get_weekly_visitors():
+    try:
+        print(datetime.now().date())
+        print((datetime.now() - timedelta(days=6)).date())
+
+        query = f"""
+        SELECT
+        V.id AS VisitID,
+        Vi.id As VisitorId,
+        Vi.name AS VisitorName,
+        Vi.phone AS VisitorPhone,
+        STRING_AGG(L.name, ', ') AS LocationsVisited,
+        V.date AS VisitDate,
+        V.entry_time AS EntryTime,
+        V.exit_time AS ExitTime
+        FROM
+            Visit AS V
+        INNER JOIN
+            Visitor AS Vi ON V.visitor_id = Vi.id
+        INNER JOIN
+            VisitDestination AS Vd ON V.id = Vd.visit_id
+        INNER JOIN
+            Location AS L ON Vd.destination_id = L.id
+            
+        WHERE V.date >= '{(datetime.now() - timedelta(days=6)).date()}' AND V.date <= '{datetime.now().date()}'
+        
+        GROUP BY
+            V.id, Vi.id, Vi.name, Vi.phone, V.date, V.entry_time, V.exit_time
+        ORDER BY
+            VisitDate DESC, EntryTime
+        """
+
+        with pyodbc.connect(conn_string) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                columns = [column[0] for column in cursor.description]
+                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        for row in rows:
+            visitor_id = row['VisitorId']
+            directory_path = f'Images/{visitor_id}'
+            filename = os.listdir(directory_path)[0]
+            with open(os.path.join(directory_path, filename), "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+            row['image'] = encoded_image
+
+        return jsonify(rows), 200
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'Failed to fetch weekly visitors.'}), 500
+
+
+
+def search_today_visitors():
+    try:
+        visitor_name = request.args.get('visitor_name')
+
+        query = f"""
+        SELECT
+        V.id AS VisitID,
+        Vi.id As VisitorId,
+        Vi.name AS VisitorName,
+        Vi.phone AS VisitorPhone,
+        STRING_AGG(L.name, ', ') AS LocationsVisited,
+        V.date AS VisitDate,
+        V.entry_time AS EntryTime,
+        V.exit_time AS ExitTime
+        FROM
+            Visit AS V
+        INNER JOIN
+            Visitor AS Vi ON V.visitor_id = Vi.id
+        INNER JOIN
+            VisitDestination AS Vd ON V.id = Vd.visit_id
+        INNER JOIN
+            Location AS L ON Vd.destination_id = L.id
+        WHERE V.date = '{(datetime.now()).date()}' AND
+        Vi.name LIKE '%{visitor_name}%'
+        GROUP BY
+            V.id, Vi.id, Vi.name, Vi.phone, V.date, V.entry_time, V.exit_time
+        ORDER BY
+            VisitDate DESC, EntryTime;
+        """
+
+        with pyodbc.connect(conn_string) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query)
+                columns = [column[0] for column in cursor.description]
+                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        for row in rows:
+            visitor_id = row['VisitorId']
+            directory_path = f'Images/{visitor_id}'
+            filename = os.listdir(directory_path)[0]
+            with open(os.path.join(directory_path, filename), "rb") as image_file:
+                encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+            row['image'] = encoded_image
+
+        return jsonify(rows), 200
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'Failed to fetch search visitors.'}), 500

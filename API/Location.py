@@ -1,6 +1,6 @@
 import pyodbc
 from flask import jsonify,request
-
+from datetime import datetime, timedelta
 import DB_Connection
 conn_string = DB_Connection.conn_string()
 
@@ -291,3 +291,31 @@ def get_location_by_camera_id(camera_id):
         return jsonify({'error': 'Failed to fetch location by camera.'}), 500
 
 
+
+def permit_location():
+    try:
+        location_id = request.args.get('location_id')
+
+        if not location_id:
+            return jsonify({'error': 'Location ID not provided.'}), 400
+
+        query_check_blocked = f"SELECT TOP 1 id FROM [RestrictedLocation] WHERE location_id = {location_id} AND end_datetime >= GETDATE() ORDER BY end_datetime DESC"
+
+        with pyodbc.connect(conn_string) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(query_check_blocked)
+                block_record = cursor.fetchone()
+
+                if block_record:
+                    block_id = block_record[0]
+                    new_end_date = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d %H:%M:%S')
+                    query_update_end_date = f"UPDATE [RestrictedLocation] SET end_datetime = '{new_end_date}' WHERE id = {block_id}"
+                    cursor.execute(query_update_end_date)
+                    conn.commit()
+                    return jsonify({'message': 'Location permitted successfully.'}), 200
+                else:
+                    return jsonify({'error': 'Location is not currently restricted.'}), 400
+
+    except Exception as e:
+        print(e)
+        return jsonify({'error': 'Failed to permit location.'}), 500
