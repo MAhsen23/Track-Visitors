@@ -9,7 +9,6 @@ import DB_Connection
 
 conn_string = DB_Connection.conn_string()
 
-
 def detectYolo(source):
     model = YOLO("F:\TrainModel\models\yolov8s.pt")
     classes = [0, 1]
