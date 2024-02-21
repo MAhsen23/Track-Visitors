@@ -56,6 +56,3 @@ def recognizeOneBoundingBox(frame):
 
         if closest_match_distance < threshold_distance:
             return closest_match_label
-
-
-
