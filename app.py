@@ -303,16 +303,13 @@ def get_visitors_report_route():
 def download_visitors_report_route():
     return Reports.download_visitors_report()
 
-
 @app.route('/AddAlert', methods=['POST'])
 def add_alert_route():
     return Alert.add_alert()
 
-
 @app.route('/GetAlertCount')
 def get_alert_count_route():
     return Alert.get_alert_count()
-
 
 @app.route('/GetCurrentAlerts', methods=['GET'])
 def get_current_alert_route():
@@ -369,7 +366,6 @@ def add_visitor():
         print(e)
         return jsonify({'error': 'Failed to process the request', 'details': str(e)}), 500
 
-
 @app.route('/GetAllVisitors', methods=['GET'])
 def get_all_visitors_route():
    return Visitor.get_all_visitors()
@@ -395,7 +391,6 @@ def get_weekly_visitors_route():
 def get_block_visitors_route():
     return Block.get_block_visitors()
 
-
 @app.route('/BlockVisitor', methods=['POST'])
 def block_visitor_route():
     return Block.block_visitor()
@@ -408,16 +403,13 @@ def block_visitor_for_day():
 def extend_block_route(id):
     return Block.extend_block(visitor_id=id)
 
-
 @app.route('/UnblockVisitor', methods=['POST'])
 def unblock_visitor_route():
     return Block.unblock_visitor()
 
-
 @app.route('/CheckVisitorBlocked/<int:id>')
 def check_visitor_blocked_route(id):
     return Block.check_visitor_blocked(visitor_id=id)
-
 
 @app.route('/GetVisitorWithImage', methods=['POST'])
 def get_visitor_with_image():
@@ -445,7 +437,6 @@ def get_visitor_with_image():
     except Exception as e:
         return f"An error occurred while fetching visitor with image: {str(e)}", 500
 
-
 @app.route('/CheckVisitorIsPresentInFrame', methods=['POST'])
 def checkVisitorInFrame():
     try:
@@ -465,7 +456,6 @@ def checkVisitorInFrame():
 
     except Exception as e:
         return f"An error occurred: {str(e)}", 500
-
 
 @app.route('/CheckVisitorIsPresent', methods=['POST'])
 def checkVisitorInVideo():
@@ -545,7 +535,6 @@ def checkVisitorInVideo():
     except Exception as e:
         return f"An error occurred: {str(e)}", 500
 
-
 @app.route('/GetDetectedFrame/<string:visitor_id>/<string:camera_name>')
 def get_detected_frame(visitor_id,camera_name):
     try:
@@ -556,7 +545,6 @@ def get_detected_frame(visitor_id,camera_name):
         return {'image': encoded_image}
     except Exception as e:
         return str(e)
-
 
 def generate_warnings(threshold,visit_id,entry_time,source_cam_id,paths):
     previous_visit_history_id = ""
@@ -682,7 +670,6 @@ def generate_warnings(threshold,visit_id,entry_time,source_cam_id,paths):
             previous_visit_history_id = rows[0]['id']
         time.sleep(60)
 
-
 def automated(source_camera,visitor_id,visit_id):
     try:
         print(f"Automation has started for visitor: {visitor_id} and source_cam: {source_camera}")
@@ -770,11 +757,9 @@ def automated(source_camera,visitor_id,visit_id):
     except Exception as e:
         return f"An error occurred: {str(e)}", 500
 
-
 @app.route('/GetVisitPathHistory', methods = ['POST'])
 def get_visit_path_history_route():
     return Path.get_visit_path_history()
-
 
 @app.route('/StartVisitWithThreads', methods=['POST'])
 def start_visit_threads():
@@ -917,7 +902,6 @@ def start_visit_threads():
         print(str(e))
         return jsonify({'error': f"An error occurred: {str(e)}"}), 500
 
-
 @app.route('/GetVisitEntryTime/<string:id>')
 def get_visit_entry_time_route(id):
     return Visit.get_visit_entry_time(id)
@@ -961,11 +945,9 @@ def end_visit():
     except Exception as e:
         return jsonify({'error': f"An error occurred: {str(e)}"}), 500
 
-
 @app.route('/GetPaths',methods=['POST'])
 def get_paths_route():
     return Path.get_paths()
-
 
 @app.route('/GetLocationPaths',methods=['POST'])
 def get_location_paths_route():
@@ -979,22 +961,25 @@ def get_location_paths_with_time_route():
 def get_connection_matrix_route():
     return Path.get_connection_matrix()
 
-def process_stream(camera_id, camera_name):
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+lock = threading.Lock()
+all_threads_processed_first_frame_event = threading.Event()
+
+def process_stream(camera_id, camera_name, first_frame_event):
     print("Thread Started of Camera", camera_id, camera_name)
-
-    while True:
-        time.sleep(10)
-        print("No visit.....")
-        query_visit_chk = f"select * from Visit where exit_time is NULL"
-        with pyodbc.connect(conn_string) as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(query_visit_chk)
-                columns = [column[0] for column in cursor.description]
-                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-        if len(rows) != 0:
-            break
 
     videoPath = f"CamerasVideo/{camera_id}.webm"
     if not os.path.exists(videoPath):
@@ -1002,88 +987,97 @@ def process_stream(camera_id, camera_name):
 
     cap = cv2.VideoCapture(videoPath)
     fps = cap.get(cv2.CAP_PROP_FPS)
-    frameCounter = 1
+    frameCounter = 0
 
     while cap.isOpened():
         ret, frame = cap.read()
         if ret:
             frameCounter += 1
             if frameCounter % int(fps) == 0:
-                frame_queue.put((camera_id,camera_name, frame,frameCounter))
+                process_frame(camera_id, camera_name, frame, frameCounter)
+                if not first_frame_event.is_set():
+                    first_frame_event.set()
                 time.sleep(1)
     cap.release()
 
 
+def process_frame(camera_id, camera_name, frame, frameCounter):
+    try:
+        print(f"Processing frame from Camera {camera_id}, Frame Number: {frameCounter}")
+        visitors_in_one_frame = returnVisitorsInFrame(frame)
+        print(f"Visitors Detected from Camera {camera_name} in frame {frameCounter}:", visitors_in_one_frame)
+
+        response = requests.get(f'{url}/GetCurrentVisitors')
+        current_visitors = response.json()
+
+        current_visitor_ids = [visitor['id'] for visitor in current_visitors]
+        print(f"Current Visitors :", current_visitor_ids)
+
+        current_visitors_detected_in_frame = [visitor for visitor in visitors_in_one_frame if
+                                              int(visitor) in current_visitor_ids]
+        print(f"Current Visitors detected in Camera{camera_name} is :", current_visitors_detected_in_frame)
+
+        for current_visitor_detected in current_visitors_detected_in_frame:
+            query_visit = f"select top 1 id from Visit where visitor_id = {current_visitor_detected} and exit_time is NULL order by id desc"
+            with pyodbc.connect(conn_string) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query_visit)
+                    visit_id = cursor.fetchone()[0]
+
+            query = f"SELECT c.name FROM VisitPathHistory v JOIN Camera c ON v.camera_id = c.id WHERE v.visit_id = {visit_id}"
+
+            with pyodbc.connect(conn_string) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(query)
+                    path_history = [record.name for record in cursor.fetchall()]
+
+            path_history.append(camera_name)
+            last_visited = path_history[-2]
+
+            folder_path = 'VisitCorrectPaths'
+            file_name = os.path.join(folder_path, f"{current_visitor_detected}.json")
+            paths = load_records(file_name)
+
+            is_not_deviated = is_visitor_on_correct_path(path_history, paths)
+
+            if last_visited != camera_name:
+                if is_not_deviated or paths[1][-1] == camera_name:
+                    path_history_query = f"insert into VisitPathHistory(visit_id, time, camera_id, is_violated) values ({visit_id}, '{datetime.datetime.now()}', {camera_id}, 0)"
+                    with pyodbc.connect(conn_string) as conn:
+                        with conn.cursor() as cursor:
+                            cursor.execute(path_history_query)
+                            conn.commit()
+                else:
+                    path_history_query = f"insert into VisitPathHistory(visit_id, time, camera_id, is_violated) values ({visit_id}, '{datetime.datetime.now()}', {camera_id}, 1)"
+                    with pyodbc.connect(conn_string) as conn:
+                        with conn.cursor() as cursor:
+                            cursor.execute(path_history_query)
+                            conn.commit()
+
+                    json_data = {'camera_id': camera_id, 'visit_id': visit_id, 'type': 'danger'}
+                    headers = {'Content-Type': 'application/json'}
+                    response = requests.post(f'{url}/AddAlert', json=json_data, headers=headers)
+
+    except Exception as e:
+        print(e)
+        print("An error occurred..")
+
 def start_threads_for_camera():
     try:
-        frame_queue.queue.clear()
         response = requests.get(f'{url}/GetAllCameras')
         cameras_data = response.json()
 
         threads = []
         for camera_data in cameras_data:
-            thread = threading.Thread(target=process_stream, args=(camera_data['id'], camera_data['name'],))
-            threads.append(thread)
+            first_frame_event = threading.Event()
+            thread = threading.Thread(target=process_stream, args=(camera_data['id'], camera_data['name'], first_frame_event))
+            threads.append((thread, first_frame_event))
             thread.start()
 
+        all_threads_processed_first_frame_event.wait()
+
         while True:
-            camera_id, camera_name, frame, frameCounter = frame_queue.get()
-            print(f"Processing frame from Camera {camera_id}")
-            visitors_in_one_frame = returnVisitorsInFrame(frame)
-            print(f"Visitors Detected from Camera{camera_name} in frame {frameCounter} is :", visitors_in_one_frame)
-
-            response = requests.get(f'{url}/GetCurrentVisitors')
-            current_visitors = response.json()
-
-            current_visitor_ids = [visitor['id'] for visitor in current_visitors]
-            print(f"Current Visitors :",current_visitor_ids)
-
-            current_visitors_detected_in_frame = [visitor for visitor in visitors_in_one_frame if int(visitor) in current_visitor_ids]
-            print(f"Current Visitors detected in Camera{camera_name} is :", current_visitors_detected_in_frame)
-
-            for current_visitor_detected in current_visitors_detected_in_frame:
-                query_visit = f"select top 1 id from Visit where visitor_id = {current_visitor_detected} and exit_time is NULL order by id desc"
-                with pyodbc.connect(conn_string) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(query_visit)
-                        visit_id = cursor.fetchone()[0]
-
-                query = f"SELECT c.name FROM VisitPathHistory v JOIN Camera c ON v.camera_id = c.id WHERE v.visit_id = {visit_id}"
-
-                with pyodbc.connect(conn_string) as conn:
-                    with conn.cursor() as cursor:
-                        cursor.execute(query)
-                        path_history = [record.name for record in cursor.fetchall()]
-
-                path_history.append(camera_name)
-                last_visited = path_history[-2]
-
-                folder_path = 'VisitCorrectPaths'
-                file_name = os.path.join(folder_path, f"{current_visitor_detected}.json")
-                paths = load_records(file_name)
-
-                is_not_deviated = is_visitor_on_correct_path(path_history, paths)
-
-                if last_visited != camera_name:
-                    if is_not_deviated or paths[1][-1] == camera_name:
-                        path_history_query = f"insert into VisitPathHistory(visit_id, time, camera_id, is_violated) values ({visit_id}, '{datetime.datetime.now()}', {camera_id}, 0)"
-                        with pyodbc.connect(conn_string) as conn:
-                            with conn.cursor() as cursor:
-                                cursor.execute(path_history_query)
-                                conn.commit()
-                    else:
-                        path_history_query = f"insert into VisitPathHistory(visit_id, time, camera_id, is_violated) values ({visit_id}, '{datetime.datetime.now()}', {camera_id}, 1)"
-                        with pyodbc.connect(conn_string) as conn:
-                            with conn.cursor() as cursor:
-                                cursor.execute(path_history_query)
-                                conn.commit()
-
-                        json_data = {'camera_id': camera_id, 'visit_id': visit_id, 'type': 'danger'}
-                        headers = {'Content-Type': 'application/json'}
-                        response = requests.post(f'{url}/AddAlert', json=json_data, headers=headers)
-
-            time.sleep(2)
-            frame_queue.task_done()
+            pass
 
     except Exception as e:
         print(e)

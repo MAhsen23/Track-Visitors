@@ -141,22 +141,22 @@ def add_camera():
                             cursor.execute(cost_query, (destination_cam_id, source_cam_id, connection_time))
                             conn.commit()
 
-                    for rowCamId in connectedCameras:
-                        for colCamId in connectedCameras:
-                            if rowCamId == colCamId:
-                                continue
-                            else:
-                                get_cost_query = "SELECT * FROM [Connection] WHERE sourceCam_id = ? AND destinationCam_id = ?"
-                                cursor.execute(get_cost_query, (rowCamId, colCamId))
-                                columns = [column[0] for column in cursor.description]
-                                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-                                if len(rows)>0:
-                                    if rows[0]['timeToReach'] > 0:
-                                        print(rows[0]['timeToReach'])
-                                        print(rowCamId,colCamId)
-                                        cursor.execute(delete_connection_query, (rowCamId, colCamId))
-                                        conn.commit()
+                    # for rowCamId in connectedCameras:
+                    #     for colCamId in connectedCameras:
+                    #         if rowCamId == colCamId:
+                    #             continue
+                    #         else:
+                    #             get_cost_query = "SELECT * FROM [Connection] WHERE sourceCam_id = ? AND destinationCam_id = ?"
+                    #             cursor.execute(get_cost_query, (rowCamId, colCamId))
+                    #             columns = [column[0] for column in cursor.description]
+                    #             rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                    #
+                    #             if len(rows)>0:
+                    #                 if rows[0]['timeToReach'] > 0:
+                    #                     print(rows[0]['timeToReach'])
+                    #                     print(rowCamId,colCamId)
+                    #                     cursor.execute(delete_connection_query, (rowCamId, colCamId))
+                    #                     conn.commit()
 
                 except Exception as e:
                     print(e)
@@ -254,22 +254,22 @@ def update_camera(camera_id):
                         conn.commit()
 
 
-                    for rowCamId in connectedCameras:
-                        for colCamId in connectedCameras:
-                            if rowCamId == colCamId:
-                                continue
-                            else:
-                                get_cost_query = "SELECT * FROM [Connection] WHERE sourceCam_id = ? AND destinationCam_id = ?"
-                                cursor.execute(get_cost_query, (rowCamId, colCamId))
-                                columns = [column[0] for column in cursor.description]
-                                rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-                                if len(rows) > 0:
-                                    if rows[0]['timeToReach'] > 0:
-                                        print(rows[0]['timeToReach'])
-                                        print(rowCamId, colCamId)
-                                        cursor.execute(delete_connection_query, (rowCamId, colCamId))
-                                        conn.commit()
+                    # for rowCamId in connectedCameras:
+                    #     for colCamId in connectedCameras:
+                    #         if rowCamId == colCamId:
+                    #             continue
+                    #         else:
+                    #             get_cost_query = "SELECT * FROM [Connection] WHERE sourceCam_id = ? AND destinationCam_id = ?"
+                    #             cursor.execute(get_cost_query, (rowCamId, colCamId))
+                    #             columns = [column[0] for column in cursor.description]
+                    #             rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+                    #
+                    #             if len(rows) > 0:
+                    #                 if rows[0]['timeToReach'] > 0:
+                    #                     print(rows[0]['timeToReach'])
+                    #                     print(rowCamId, colCamId)
+                    #                     cursor.execute(delete_connection_query, (rowCamId, colCamId))
+                    #                     conn.commit()
 
                 except Exception as e:
                     print(e)
